@@ -6,6 +6,7 @@
 #include "esp32_logger.h"
 #include "i2c_master.h"
 #include "shelfbot_comms.h"
+#include "shelfbot_motor.h"
 
 // SSID and password of Wifi connection:
 const char* ssid = "dlink-30C0";
@@ -13,7 +14,6 @@ const char* password = "ypics98298";
 
 //Webserver listening on port 80
 WebServer server(80);
-
 ShelfbotComms comms;
 
 // simple function to decipher the encryption type of a network
@@ -33,6 +33,7 @@ String translateEncryptionType(wifi_auth_mode_t encryptionType) {
             return "Unknown";
     }
 }
+
 // Function to scan and print all networks that can be detected by the ESP32 
 void scanNetworks() {
   int numberOfNetworks = WiFi.scanNetworks();
@@ -105,9 +106,24 @@ void handleMessage() {
     }
 }
 
+void handleCommand() {
+    if (server.hasArg("cmd")) {
+        String cmdString = server.arg("cmd");
+        esp32_logger::ESP32Logger::log("Command received: " + cmdString);
+        
+        String response = "";
+        //String response = comms.handleCommand(cmdString response = I2CSlave::getLastResponse();
+        server.send(200, "text/plain", response);
+        esp32_logger::ESP32Logger::log("Command response: " + response);
+    } else {
+        server.send(400, "text/plain", comms.formatResponse(RESP_ERR_PARAM, "Missing cmd parameter"));
+    }
+}
+
 void setupMessageEndpoint() {
     server.on("/log", handleLog);
     server.on("/message", handleMessage);
+    server.on("/command", handleCommand);
 }
 
 void setupWebServer() {
@@ -206,6 +222,63 @@ void testAllCommands() {
     Serial.println("=== Test Complete ===\n");
 }
 
+void nonBlockingMotorRoutine(int delayValue) {
+  Serial.println("Moving to position 1000... ShelfbotMotor::nonBlockingMoveAllMotors(1000)");
+  ShelfbotMotor::nonBlockingMoveAllMotors(1000);
+  ShelfbotMotor::printMotorSpeeds();
+  delay(delayValue);
+
+  Serial.println("Moving to position 0... ShelfbotMotor::nonBlockingMoveAllMotors(0)");
+  ShelfbotMotor::nonBlockingMoveAllMotors(0);
+  ShelfbotMotor::printMotorSpeeds();
+  delay(delayValue);
+
+  Serial.println("Moving to position -2000... ShelfbotMotor::nonBlockingMoveAllMotors(-2000)");
+  ShelfbotMotor::nonBlockingMoveAllMotors(-2000);
+  ShelfbotMotor::printMotorSpeeds();
+  delay(delayValue);
+
+  Serial.println("Moving to position 20000... ShelfbotMotor::nonBlockingMoveAllMotors(-2000)");
+  ShelfbotMotor::nonBlockingMoveAllMotors(20000);
+  ShelfbotMotor::printMotorSpeeds();
+  delay(delayValue);
+}
+
+void motorRoutine(int delayValue) {
+    Serial.println("Moving to position 1000...");
+    ShelfbotMotor::moveAllMotors(1000);
+    delay(2000);
+    delay(delayValue);
+    
+    Serial.println("Moving to position 0...");
+    ShelfbotMotor::moveAllMotors(0);
+    delay(delayValue);
+    
+    Serial.println("Moving to position -1000...");
+    ShelfbotMotor::moveAllMotors(-1000);
+    delay(delayValue);
+ 
+    Serial.println("Moving to position 0...");
+    ShelfbotMotor::moveAllMotors(0);
+    delay(delayValue);
+
+    Serial.println("Moving to position -2000...");
+    ShelfbotMotor::moveAllMotors(2000);
+    delay(delayValue);
+ 
+    Serial.println("Moving to position 0...");
+    ShelfbotMotor::moveAllMotors(0);
+    delay(delayValue);
+
+    Serial.println("Moving to position -2000...");
+    ShelfbotMotor::moveAllMotors(-2000);
+    delay(delayValue);
+    
+    // Print motor speeds for monitoring
+    ShelfbotMotor::printMotorSpeeds();
+}
+
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -216,9 +289,20 @@ void setup() {
     initWebServer();
     I2CMaster::scanBus();
     testAllCommands();
+    
+    // Initialize motor control
+    ShelfbotMotor::begin();
+    
+    // Set initial speeds and acceleration
+    ShelfbotMotor::setAllMotorSpeeds(4000);
+
+    for (int i=0; i<2; i++) {
+        nonBlockingMotorRoutine(2000);
+    }
 }
 
 void loop() {
+
   /*
   ShelfbotComms::sendCommand(CMD_SET_MOTOR_1, 1000);
   delay(4000);
@@ -240,6 +324,7 @@ void loop() {
   ShelfbotComms::sendCommand(CMD_SET_MOTOR_4, 0);
   delay(4000);
   */
+
   delay(40);
   handleWebServer();
 }
