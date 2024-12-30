@@ -1,19 +1,10 @@
 #include "shelfbot_comms.h"
-
-#ifdef I2C_SLAVE_DEVICE
-extern AccelStepper steppers[];
-#endif
+#include "shelfbot_motor.h"
 
 void ShelfbotComms::begin() {
     Serial.begin(115200);
-    #ifdef I2C_SLAVE_DEVICE
-    Serial.println("\nStarting I2C as slave");
-    I2CSlave::begin();
-    #else
-    Serial.println("\nStarting I2C as master");
-    I2CMaster::begin();
-    #endif
 }
+
 String ShelfbotComms::formatResponse(CommandResponse resp, const String& value) {
     String response;
     response.reserve(32);
@@ -25,30 +16,10 @@ String ShelfbotComms::formatResponse(CommandResponse resp, const String& value) 
 
 void ShelfbotComms::sendCommand(CommandType cmd, uint16_t value) {
     String formattedCmd = formatCommand(cmd, String(value));
-    
-    #ifndef I2C_SLAVE_DEVICE
     Serial.printf("\n=== COMMAND SENT ===\n");
     Serial.printf("Type: 0x%04X\n", cmd);
     Serial.printf("Value: %d\n", value);
     Serial.printf("Raw: %s\n", formattedCmd.c_str());
-    
-    String response = I2CMaster::communicateWithSlave(I2C_SLAVE_ADDR, formattedCmd.c_str());
-    
-    if (response.length() >= 2) {
-        uint16_t respCode = (response[0] << 8) | response[1];
-        CommandResponse responseType = static_cast<CommandResponse>(respCode);
-        String responseValue = response.substring(2);
-        
-        Serial.printf("\n=== RESPONSE RECEIVED ===\n");
-        Serial.printf("Status: %s\n", formatResponse(responseType, responseValue).c_str());
-        Serial.printf("Response Code: 0x%04X\n", respCode);
-        Serial.printf("Value: %s\n", responseValue.c_str());
-        Serial.printf("Raw: %s\n", response.c_str());
-        Serial.println("=====================\n");
-    } else {
-        Serial.println("ERROR: Invalid response format");
-    }
-    #endif
 }
 
 CommandType ShelfbotComms::parseCommand(const String& message) {
@@ -60,7 +31,6 @@ CommandType ShelfbotComms::parseCommand(const String& message) {
 String ShelfbotComms::parseValue(const String& message) {
     int valueStart = message.indexOf((char)(CMD_VALUE_START >> 8));
     int valueEnd = message.indexOf((char)(CMD_VALUE_END >> 8));
-    
     if(valueStart < 0 || valueEnd < 0) return "";
     valueStart += 2;
     return message.substring(valueStart, valueEnd);
@@ -94,14 +64,12 @@ String ShelfbotComms::formatCommand(CommandType cmd, const String& value) {
     command += (char)(CMD_CHECKSUM_END & 0xFF);
     command += (char)(CMD_END_MARKER >> 8);
     command += (char)(CMD_END_MARKER & 0xFF);
-    
     return command;
 }
 
 bool ShelfbotComms::verifyChecksum(const String& message) {
     int valueStart = message.indexOf((char)(CMD_VALUE_START >> 8));
     int checksumStart = message.indexOf((char)(CMD_CHECKSUM_START >> 8));
-    
     if(valueStart < 0 || checksumStart < 0) return false;
     
     byte calculatedChecksum = 0;
@@ -113,8 +81,6 @@ bool ShelfbotComms::verifyChecksum(const String& message) {
     return calculatedChecksum == strtol(receivedChecksum.c_str(), NULL, 16);
 }
 
-#ifdef I2C_SLAVE_DEVICE
-
 String ShelfbotComms::getTemperature() {
     Serial.println("Reading temperature sensor");
     return String(analogRead(A0) * 0.48876f);
@@ -123,8 +89,8 @@ String ShelfbotComms::getTemperature() {
 String ShelfbotComms::setLed(const String& value) {
     int state = value.toInt();
     if(state != 0 && state != 1) return "ERR_VALUE";
-    digitalWrite(LED_BUILTIN, state);
-    return String(digitalRead(LED_BUILTIN));
+    digitalWrite(2, state);  // Using GPIO2 for ESP32 built-in LED
+    return String(digitalRead(2));
 }
 
 String ShelfbotComms::readAdc(const String& value) {
@@ -146,74 +112,29 @@ String ShelfbotComms::getStatus() {
     return String(millis());
 }
 
-#define NUM_MOTORS 6
 void ShelfbotComms::moveAllMotors(long position) {
-    Serial.print("\nShelfbotComms::moveAllMotors(");
-    Serial.print(position, DEC);
-    Serial.print(") <<<<<");
-
-    // Set target position
-    for (int i = 0; i < NUM_MOTORS; i++) {
-        steppers[i].moveTo(position);
-        steppers[i].setSpeed(steppers[i].maxSpeed());
-    }
-    
-    // Run motors
-    while (true) {
-        bool allDone = true;
-        for (int i = 0; i < NUM_MOTORS; i++) {
-            if (steppers[i].distanceToGo() != 0) {
-                steppers[i].runSpeedToPosition();
-                allDone = false;
-            }
-        }
-        if (allDone) break;
-    }
+    ShelfbotMotor::moveAllMotors(position);
 }
 
 String ShelfbotComms::setMotor(uint8_t index, const String& value) {
-    Serial.print("\nShelfbotComms::setMotor - Setting motor ");
-    Serial.print(index, DEC);
-    Serial.print(" to position: ");
     long position = value.toInt();
-    Serial.println(position, DEC);
-
-    if(index >= 6) {
-        return formatResponse(RESP_ERR_MOTOR, String(index));
-    }
-
-    steppers[index].moveTo(position);
-    steppers[index].setSpeed(steppers[index].maxSpeed());
-
-    String status = String(steppers[index].currentPosition()) + "," +
-           String(steppers[index].targetPosition()) + "," +
-           String(steppers[index].distanceToGo()) + "," +
-           String(steppers[index].speed());
-    
-    return formatResponse(RESP_MOVING, status);
+    return ShelfbotMotor::setMotor(index, position);
 }
 
 String ShelfbotComms::getMotorPosition(uint8_t index) {
-    if(index >= 6) return "ERR_MOTOR";
-    return String(steppers[index].currentPosition());
+    return ShelfbotMotor::getMotorPosition(index);
 }
 
 String ShelfbotComms::getMotorVelocity(uint8_t index) {
-    if(index >= 6) return "ERR_MOTOR";
-    return String(steppers[index].speed());
+    return ShelfbotMotor::getMotorVelocity(index);
 }
 
 String ShelfbotComms::stopMotor(uint8_t index) {
-    if(index >= 6) return "ERR_MOTOR";
-    steppers[index].stop();
-    return String(steppers[index].currentPosition());
+    return ShelfbotMotor::stopMotor(index);
 }
 
 String ShelfbotComms::stopAllMotors() {
-    for(int i = 0; i < 6; i++) {
-        steppers[i].stop();
-    }
-    return "STOPPED";
+    return ShelfbotMotor::stopAllMotors();
 }
 
 String ShelfbotComms::getBatteryLevel() {
@@ -224,13 +145,10 @@ String ShelfbotComms::getSystemStatus() {
     return String(millis());
 }
 
-void ShelfbotComms::handleCommand(char* message) {
+String ShelfbotComms::handleCommand(char* message) {
     String msg(message);
     if (!verifyChecksum(msg)) {
-        #ifdef I2C_SLAVE_DEVICE
-        I2CSlave::setResponse("ERR_CHECKSUM");
-        #endif
-        return;
+        return formatResponse(RESP_ERR_CRC, "Checksum verification failed");
     }
 
     CommandType cmd = parseCommand(msg);
@@ -335,18 +253,8 @@ void ShelfbotComms::handleCommand(char* message) {
             response = getSystemStatus();
             break;
         default:
-            response = "ERR_CMD";
+            response = formatResponse(RESP_ERR_PARAM, "Unknown command");
             break;
     }
-    I2CSlave::setResponse(response.c_str());
-}
-#endif
-
-void ShelfbotComms::handleComms() {
-    #ifdef I2C_SLAVE_DEVICE
-    char* message = I2CSlave::getMessage();
-    if(message != nullptr) {
-        handleCommand(message);
-    }
-    #endif
+    return response;
 }

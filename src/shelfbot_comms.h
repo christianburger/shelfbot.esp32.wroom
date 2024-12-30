@@ -1,15 +1,8 @@
 #ifndef SHELFBOT_COMMS_H
 #define SHELFBOT_COMMS_H
+
 #include <Arduino.h>
 
-#ifdef I2C_SLAVE_DEVICE
-#include <AccelStepper.h>
-#include "i2c_slave.h"
-#else
-#include "i2c_master.h"
-#endif
-
-// In shelfbot_comms.h
 // Define markers as 16-bit values
 #define CMD_START_MARKER 0x3C3C  // "<<"
 #define CMD_END_MARKER 0x3E3E    // ">>"
@@ -43,7 +36,6 @@ enum CommandResponse : uint16_t {
     RESP_ERR_CRC = 0x4352    // "CR"
 };
 
-// Define commands as 16-bit values
 enum CommandType : uint16_t {
     CMD_UNKNOWN = 0x3F3F,     // "??"
     CMD_GET_TEMP = 0x4754,    // "GT"
@@ -84,16 +76,12 @@ class ShelfbotComms {
 public:
     static void begin();
     static void handleComms();
-    static void handleCommand(char* message);
-
+    static String handleCommand(char* message);
     static void sendCommand(CommandType cmd, uint16_t value = 0);
-
     static String formatResponse(CommandResponse resp, const String& value);
     static String formatCommand(CommandType cmd, const String& value);
-
     static String parseValue(const String& message);
     static CommandType parseCommand(const String& message);
-
     static bool verifyChecksum(const String& message);
     static void moveAllMotors(long position);
 
