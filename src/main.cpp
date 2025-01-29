@@ -84,8 +84,18 @@ void nonBlockingMotorRoutine(int delayValue) {
     ShelfbotMotor::printMotorSpeeds();
     delay(delayValue);
 
-    Serial.println("Moving to position 20000... ShelfbotMotor::nonBlockingMoveAllMotors(-2000)");
-    ShelfbotMotor::nonBlockingMoveAllMotors(20000);
+    Serial.println("Moving to position 2000... ShelfbotMotor::nonBlockingMoveAllMotors(-2000)");
+    ShelfbotMotor::nonBlockingMoveAllMotors(2000);
+    ShelfbotMotor::printMotorSpeeds();
+    delay(delayValue);
+
+    Serial.println("Moving to position -4000... ShelfbotMotor::nonBlockingMoveAllMotors(-2000)");
+    ShelfbotMotor::nonBlockingMoveAllMotors(-4000);
+    ShelfbotMotor::printMotorSpeeds();
+    delay(delayValue);
+
+    Serial.println("Moving to position 4000... ShelfbotMotor::nonBlockingMoveAllMotors(-2000)");
+    ShelfbotMotor::nonBlockingMoveAllMotors(4000);
     ShelfbotMotor::printMotorSpeeds();
     delay(delayValue);
 }
