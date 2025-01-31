@@ -1,5 +1,6 @@
-
+#include <ArduinoJson.h>
 #include "shelfbot_webserver.h"
+#include "shelfbot_motor.h"
 
 WebServer ShelfbotWebServer::server(80);
 ShelfbotComms ShelfbotWebServer::comms;
@@ -60,15 +61,6 @@ void ShelfbotWebServer::setupTime() {
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 0);
     tzset();
-}
-
-void ShelfbotWebServer::setupEndpoints() {
-    // Existing GET endpoints
-    server.on("/", handleRoot);
-    server.on("/log", handleLog);
-    server.on("/message", handleMessage);
-    server.on("/command", handleCommand);
-    server.on("/control.js", handleJavaScript);
 }
 
 const char* ShelfbotWebServer::javascriptContent = R"(
@@ -175,4 +167,133 @@ void ShelfbotWebServer::handleCommand() {
         
         server.send(200, "text/html", response);
     }
+}
+
+void ShelfbotWebServer::setupEndpoints() {
+    Serial.println("\n=== Setting up Web Endpoints ===");
+    
+    // Existing GET endpoints
+    server.on("/", handleRoot);
+    server.on("/log", handleLog);
+    server.on("/message", handleMessage);
+    server.on("/command", handleCommand);
+    server.on("/control.js", handleJavaScript);
+
+    // New POST endpoints with debug prints
+    Serial.println("Registering POST /motor endpoint");
+    server.on("/motor", HTTP_POST, handleMotorMove);
+    
+    Serial.println("Registering POST /motors endpoint");
+    server.on("/motors", HTTP_POST, handleAllMotorsMove);
+    
+    Serial.println("Registering POST /twist endpoint");
+    server.on("/twist", HTTP_POST, handleTwist);
+    
+    Serial.println("Registering POST /capture endpoint");
+    server.on("/capture", HTTP_POST, handleCapture);
+    
+    Serial.println("=== Web Endpoints Setup Complete ===\n");
+    Serial.println("Registering POST /test endpoint");
+    server.on("/test", HTTP_POST, handleTest);
+}
+void ShelfbotWebServer::handleMotorMove() {
+    Serial.println("\n=== Motor Move Request ===");
+    
+    if (!server.hasArg("plain")) {
+        Serial.println("Error: Missing request body");
+        server.send(400, "text/plain", "Missing body");
+        return;
+    }
+    
+    String body = server.arg("plain");
+    Serial.print("Received body: ");
+    Serial.println(body);
+    
+    DynamicJsonDocument doc(200);
+    DeserializationError error = deserializeJson(doc, body);
+    
+    if (error) {
+        Serial.print("JSON Parse Error: ");
+        Serial.println(error.c_str());
+        server.send(400, "text/plain", "Invalid JSON");
+        return;
+    }
+    
+    uint8_t motor = doc["motor"];
+    long position = doc["position"];
+    long speed = doc["speed"];
+    
+    Serial.printf("Moving motor %d to position %ld at speed %ld\n", motor, position, speed);
+    
+    String response = ShelfbotMotor::setMotorPosition(motor, position);
+    Serial.print("Motor response: ");
+    Serial.println(response);
+    
+    server.send(200, "application/json", response);
+    Serial.println("=== Request Complete ===\n");
+}
+void ShelfbotWebServer::handleAllMotorsMove() {
+    if (!server.hasArg("plain")) {
+        server.send(400, "text/plain", "Missing body");
+        return;
+    }
+    
+    String body = server.arg("plain");
+    DynamicJsonDocument doc(200);
+    DeserializationError error = deserializeJson(doc, body);
+    
+    if (error) {
+        server.send(400, "text/plain", "Invalid JSON");
+        return;
+    }
+    
+    long position = doc["position"];
+    long speed = doc["speed"];
+    bool nonBlocking = doc["nonBlocking"] | false;
+    
+    ShelfbotMotor::moveAllMotors(position, speed, nonBlocking);
+    server.send(200, "application/json", "{\"status\":\"moving\"}");
+}
+
+void ShelfbotWebServer::handleTwist() {
+    if (!server.hasArg("plain")) {
+        server.send(400, "text/plain", "Missing body");
+        return;
+    }
+    
+    String body = server.arg("plain");
+    DynamicJsonDocument doc(200);
+    DeserializationError error = deserializeJson(doc, body);
+    
+    if (error) {
+        server.send(400, "text/plain", "Invalid JSON");
+        return;
+    }
+    
+    String direction = doc["direction"];
+    long speed = doc["speed"];
+    
+    // Left motors move opposite to right motors for twist
+    if (direction == "left") {
+        ShelfbotMotor::setMotorPosition(0, 1000);
+        ShelfbotMotor::setMotorPosition(2, 1000);
+        ShelfbotMotor::setMotorPosition(1, -1000);
+        ShelfbotMotor::setMotorPosition(3, -1000);
+    } else {
+        ShelfbotMotor::setMotorPosition(0, -1000);
+        ShelfbotMotor::setMotorPosition(2, -1000);
+        ShelfbotMotor::setMotorPosition(1, 1000);
+        ShelfbotMotor::setMotorPosition(3, 1000);
+    }
+    
+    server.send(200, "application/json", "{\"status\":\"twisting\"}");
+}
+
+void ShelfbotWebServer::handleCapture() {
+    server.send(200, "application/json", "{\"status\":\"captured\"}");
+}
+
+void ShelfbotWebServer::handleTest() {
+    Serial.println("Test endpoint hit!");
+    server.send(200, "text/plain", "Test endpoint working");
 }

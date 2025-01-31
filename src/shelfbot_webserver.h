@@ -30,5 +30,11 @@ private:
     static void handleMessage();
     static void handleCommand();
     static void handleJavaScript(); 
+
+    static void handleMotorMove();
+    static void handleAllMotorsMove();
+    static void handleTwist();
+    static void handleCapture();
+    static void handleTest();
 };
 #endif

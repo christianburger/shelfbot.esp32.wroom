@@ -137,7 +137,7 @@ void setup() {
     webServer.begin();
     ShelfbotMotor::begin();
     ShelfbotMotor::setAllMotorSpeeds(4000);
-    motorRoutine(4000);
+    //motorRoutine(4000);
 }
 
 void loop() {
