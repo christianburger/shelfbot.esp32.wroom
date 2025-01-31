@@ -1,3 +1,4 @@
+
 #include "shelfbot_webserver.h"
 
 WebServer ShelfbotWebServer::server(80);
@@ -62,10 +63,32 @@ void ShelfbotWebServer::setupTime() {
 }
 
 void ShelfbotWebServer::setupEndpoints() {
+    // Existing GET endpoints
     server.on("/", handleRoot);
     server.on("/log", handleLog);
     server.on("/message", handleMessage);
     server.on("/command", handleCommand);
+    server.on("/control.js", handleJavaScript);
+}
+
+const char* ShelfbotWebServer::javascriptContent = R"(
+    function sendCommand(motor, position) {
+        const cmd = `<<M${motor}{{${position}}}##3F$$>>`;
+        fetch(`/command?cmd=${encodeURIComponent(cmd)}`)
+            .then(response => response.text())
+            .then(data => console.log(data));
+    }
+
+    function setSpeed(speed) {
+        const cmd = `<<SP{{${speed}}}##3F$$>>`;
+        fetch(`/command?cmd=${encodeURIComponent(cmd)}`)
+            .then(response => response.text())
+            .then(data => console.log(data));
+    }
+)";
+
+void ShelfbotWebServer::handleJavaScript() {
+    server.send(200, "application/javascript", javascriptContent);
 }
 
 void ShelfbotWebServer::handle() {
@@ -75,7 +98,7 @@ void ShelfbotWebServer::handle() {
 void ShelfbotWebServer::handleRoot() {
     time_t now = time(nullptr);
     String timeString = ctime(&now);
-    timeString.trim();  
+    timeString.trim();
     
     unsigned long rawTime = millis();
     unsigned long ms = rawTime % 1000;
@@ -83,7 +106,9 @@ void ShelfbotWebServer::handleRoot() {
     unsigned long minutes = (rawTime / 60000) % 60;
     unsigned long hours = (rawTime / 3600000);
     
-    String html = "<html><body>";
+    String html = "<html><head>";
+    html += "<script src='/control.js'></script>";
+    html += "</head><body>";
     html += "<h1>Shelfbot Status</h1>";
     html += "<div>Current Time: " + timeString + "</div>";
     html += "<div>Raw Uptime: " + String(rawTime) + " ms</div>";
@@ -92,6 +117,22 @@ void ShelfbotWebServer::handleRoot() {
     html += "<div>Signal Strength: " + String(WiFi.RSSI()) + " dBm</div>";
     html += "<div>IP Address: " + WiFi.localIP().toString() + "</div>";
     html += "<div>MAC Address: " + WiFi.macAddress() + "</div>";
+    
+    // Add motor control UI
+    html += "<div style='margin-top: 20px'>";
+    html += "<h2>Motor Control</h2>";
+    for (int i = 1; i <= 6; i++) {
+        html += "<div style='margin: 10px'>";
+        html += "<button onclick='sendCommand(" + String(i) + ", 4000)'>Motor " + String(i) + " Forward</button>";
+        html += "<button onclick='sendCommand(" + String(i) + ", 0)'>Motor " + String(i) + " Back</button>";
+        html += "</div>";
+    }
+    html += "<div style='margin: 10px'>";
+    html += "<input type='number' id='speed' value='4000'>";
+    html += "<button onclick='setSpeed(document.getElementById(\"speed\").value)'>Set Speed</button>";
+    html += "</div>";
+    html += "</div>";
+    
     html += "</body></html>";
     
     server.send(200, "text/html", html);

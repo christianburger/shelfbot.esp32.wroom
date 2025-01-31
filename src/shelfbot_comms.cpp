@@ -112,13 +112,15 @@ String ShelfbotComms::getStatus() {
     return String(millis());
 }
 
+// In ShelfbotComms::moveAllMotors
 void ShelfbotComms::moveAllMotors(long position) {
-    ShelfbotMotor::moveAllMotors(position);
+    // Use a default speed of 4000 Hz
+    ShelfbotMotor::moveAllMotors(position, 4000, true);
 }
 
 String ShelfbotComms::setMotor(uint8_t index, const String& value) {
     long position = value.toInt();
-    return ShelfbotMotor::setMotor(index, position);
+    return ShelfbotMotor::setMotorPosition(index, position);
 }
 
 String ShelfbotComms::getMotorPosition(uint8_t index) {

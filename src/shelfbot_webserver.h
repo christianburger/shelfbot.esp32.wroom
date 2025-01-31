@@ -6,6 +6,9 @@
 #include "shelfbot_comms.h"
 
 class ShelfbotWebServer {
+private:
+    static const char* javascriptContent;
+
 public:
     static void begin();
     static void handle();
@@ -24,9 +27,8 @@ private:
     static void handleRoot();
     static void handleLog();
     static void setupEndpoints();
-
     static void handleMessage();
     static void handleCommand();
-
+    static void handleJavaScript(); 
 };
 #endif

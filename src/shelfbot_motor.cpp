@@ -66,14 +66,25 @@ bool ShelfbotMotor::areAllMotorsStopped() {
     }
     return true;
 }
-void ShelfbotMotor::moveAllMotors(long position) {
-    // Set target positions
+
+void ShelfbotMotor::moveAllMotors(long position, long speed, bool nonBlocking) {
+    // Set speeds for all motors
     for (int i = 0; i < NUM_MOTORS; i++) {
         if (steppers[i]) {
-            steppers[i]->moveTo(position, false);  // non-blocking move
+            steppers[i]->setSpeedInHz(speed);
+            steppers[i]->setAcceleration(speed/2);
         }
     }
-    
+
+    if (steppers[0]) steppers[0]->moveTo(-1 * position);
+    if (steppers[1]) steppers[1]->moveTo(-1 * position);
+    if (steppers[2]) steppers[2]->moveTo(1 * position);
+    if (steppers[3]) steppers[3]->moveTo(1 * position);
+
+    if (nonBlocking) {
+        return;
+    }
+
     // Wait until all motors have completed their moves
     while (true) {
         bool allDone = true;
@@ -87,7 +98,7 @@ void ShelfbotMotor::moveAllMotors(long position) {
     }
 }
 
-String ShelfbotMotor::setMotor(uint8_t index, long position) {
+String ShelfbotMotor::setMotorPosition(uint8_t index, long position) {
     if (index >= NUM_MOTORS || !steppers[index]) {
         return ShelfbotComms::formatResponse(RESP_ERR_MOTOR, String(index));
     }
@@ -135,6 +146,7 @@ void ShelfbotMotor::setAllMotorSpeeds(long speed) {
     for (int i = 0; i < NUM_MOTORS; i++) {
         if (steppers[i]) {
             steppers[i]->setSpeedInHz(speed);
+            steppers[i]->setAcceleration(speed/2);
         }
     }
 }

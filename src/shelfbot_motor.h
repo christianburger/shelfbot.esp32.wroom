@@ -8,12 +8,12 @@
 class ShelfbotMotor {
 public:
     static void begin();
-    static void moveAllMotors(long position);
+    static void moveAllMotors(long position, long speed, bool nonBlocking = false);
 
     static void nonBlockingMoveAllMotors(long position);
     static bool areAllMotorsStopped();
 
-    static String setMotor(uint8_t index, long position);
+    static String setMotorPosition(uint8_t index, long position);
     static String getMotorPosition(uint8_t index);
     static String getMotorVelocity(uint8_t index);
     static String stopMotor(uint8_t index);

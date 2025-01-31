@@ -69,6 +69,7 @@ void testAllCommands() {
 }
 
 void nonBlockingMotorRoutine(int delayValue) {
+  /*
     Serial.println("Moving to position 1000... ShelfbotMotor::nonBlockingMoveAllMotors(1000)");
     ShelfbotMotor::nonBlockingMoveAllMotors(1000);
     ShelfbotMotor::printMotorSpeeds();
@@ -98,82 +99,48 @@ void nonBlockingMotorRoutine(int delayValue) {
     ShelfbotMotor::nonBlockingMoveAllMotors(4000);
     ShelfbotMotor::printMotorSpeeds();
     delay(delayValue);
+
+  */
 }
 
 void motorRoutine(int delayValue) {
-    Serial.println("Moving to position 1000...");
-    ShelfbotMotor::moveAllMotors(1000);
-    delay(2000);
-    delay(delayValue);
-    
-    Serial.println("Moving to position 0...");
-    ShelfbotMotor::moveAllMotors(0);
-    delay(delayValue);
-    
-    Serial.println("Moving to position -1000...");
-    ShelfbotMotor::moveAllMotors(-1000);
-    delay(delayValue);
- 
-    Serial.println("Moving to position 0...");
-    ShelfbotMotor::moveAllMotors(0);
-    delay(delayValue);
+    int position = 4000;
+    for (int i=0; i<4; i++) {
+      for (int j=0; j<4; j++) {
+        int loopPosition = ((j&1)?position:-position);
+        Serial.printf("\nMoving motor: %d to position %d ... \n\n", (i+1), loopPosition);
+        //ShelfbotMotor::moveAllMotors(loopPosition, 2000, false);
+        ShelfbotMotor::setMotorPosition(i, loopPosition);
+        ShelfbotMotor::printMotorSpeeds();
+        delay(delayValue);
+    }
+  }
 
-    Serial.println("Moving to position -2000...");
-    ShelfbotMotor::moveAllMotors(2000);
-    delay(delayValue);
- 
-    Serial.println("Moving to position 0...");
-    ShelfbotMotor::moveAllMotors(0);
-    delay(delayValue);
+  Serial.printf("\nMoving all motors to position 0 now! ... \n");
+  ShelfbotMotor::moveAllMotors(0, 2000, false);
+  delay(10000);
 
-    Serial.println("Moving to position -2000...");
-    ShelfbotMotor::moveAllMotors(-2000);
-    delay(delayValue);
-    
-    // Print motor speeds for monitoring
+  for (int j=0; j<20; j++) {
+    int loopPosition = ((j&1)?position:-position);
+    Serial.printf("\nMoving all motors to position %d ... \n", loopPosition);
+    //ShelfbotMotor::moveAllMotors(loopPosition, 2000, false);
+    ShelfbotMotor::moveAllMotors(loopPosition, 2000, false);
     ShelfbotMotor::printMotorSpeeds();
+    delay(delayValue);
+  }
+
 }
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);
     initLogging();
-
-    testAllCommands();
-
     webServer.begin();
-    
     ShelfbotMotor::begin();
     ShelfbotMotor::setAllMotorSpeeds(4000);
-
-    for (int i=0; i<2; i++) {
-        nonBlockingMotorRoutine(2000);
-    }
+    motorRoutine(4000);
 }
 
 void loop() {
-    /*
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_1, 1000);
-    delay(4000);
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_1, 0);
-    delay(4000);
- 
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_2, 1000);
-    delay(4000);
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_2, 0);
-    delay(4000);
- 
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_3, 1000);
-    delay(4000);
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_3, 0);
-    delay(4000);
-
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_4, 1000);
-    delay(4000);
-    ShelfbotComms::sendCommand(CMD_SET_MOTOR_4, 0);
-    delay(4000);
-    */
-
     delay(40);
     webServer.handle();
 }
